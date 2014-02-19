@@ -1,0 +1,229 @@
+The Gems inside Rubygems
+========================
+:author: Chris Riddoch
+:copyright: Chris Riddoch, Feb. 18 2014
+:backend: slidy
+
+Talk notes
+----------
+
+Presented to the Boulder Ruby Group
+February 18, 2014
+
+http://syntacticsugar.org/rubygems/
+
+A bit of code
+-------------
+
+-----
+pry(main)> Dir.glob("**/*").
+           delete_if {|f| f =~ /^.git/ or !File.file? f}.
+           map {|f| File.open(f, 'r').readlines.length }.
+           inject(&:+)
+=> 64606
+-----
+
+Takes a while to read...
+
+A better place to start: http://guides.rubygems.org/
+
+Gem installations taking too long?
+----------------------------------
+
+In your ~/.gemrc - if you really can't wait:
+
+-----
+install: --no-rdoc --no-ri
+update: --no-rdoc --no-ri
+-----
+
+But don't do this!
+
+Gem #1: gem server
+------------------
+
+-----
+riddochc@cassia:~> gem server
+Server started at http://0.0.0.0:8808
+------
+
+Point browser at http://localhost:8808/
+
+#2: Making a local mirror.
+--------------------------
+
+Make a place for your gems, say:
+
+-----
+mkdir -p /srv/www/htdocs/rubygems/gems/
+-----
+
+Copy *.gem files there.
+
+-----
+cp ~/.gem/cache/*.gem 
+-----
+
+Then, run generate_index
+------------------------
+
+-----
+riddochc@cassia:~> gem generate_index -d /srv/www/htdocs/rubygems/
+Generating Marshal quick index gemspecs for 100 gems
+....................................................................................................
+Complete
+Generated Marshal quick index gemspecs: 0.375s
+Generating specs index
+Generated specs index: 0.022s
+Generating latest specs index
+Generated latest specs index: 0.014s
+Generating prerelease specs index
+Generated prerelease specs index: 0.000s
+Compressing indicies
+Compressed indicies: 0.017s
+------
+
+Configure rubygems to use your local mirror
+-------------------------------------------
+
+-----
+riddochc@cassia:~> gem sources --add http://localhost/rubygems/
+-----
+
+This modifies your ~/.gemrc
+
+-----
+---
+:backtrace: false
+:bulk_threshold: 1000
+:sources:
+- https://rubygems.org/
+- http://localhost/rubygems/
+:update_sources: true
+:verbose: true
+-----
+
+Note... your project's Gemfile takes precedence.
+Bundler overrdes a lot of this.
+
+#3: Some Potentially useful tools on their own
+----------------------------------------------
+
+Maybe you don't need the minitar gem after all?
+
+* Gem::Package::TarReader, TarWriter
+
+* Gem::Text.format_text(text, wrap, indent)  - Wraps text.
+
+* Gem::Text.levenshtein_distance(a, b) - How hard is it to transform string a into string b?
+  
+* Gem::Util.gunzip(data), .gzip(data) - A notch simpler than zlib's interface
+
+* Gem::Util.silent_system - The docs: "Invokes system, but silences all output."
+
+#4: Hooks!
+----------
+
+* pre_install
+* post_install
+* done_installing
+* pre_uninstall
+* post_uninstall
+
+A simple example from lib/rubygems/install_message.rb:
+
+------
+Gem.post_install do |installer|
+  ui = Gem::DefaultUserInteraction.ui
+  ui.say "Successfully installed #{installer.spec.full_name}"
+end
+------
+
+#4.5: Plugins!
+--------------
+
+http://guides.rubygems.org/plugins/
+
+#5: Arbitrary metadata in a gem specification
+---------------------------------------------
+
+There's now a 'metadata' field in the specification, its value is a hash.
+
+-----
+grep metadata ~/.gem/specifications/*
+-----
+
+Lots of potential uses with this combined with the hooks!
+
+* Github, CI, etc.
+
+#6: Why is loading gems so slow?
+--------------------------------
+
+A default from bundler.  This is how bundler's own gemspec
+does it, and it's not good.
+
+-----
+spec.files = `git ls-files -z`.split("\x0")
+-----
+
+Every time you require 'gem', git ls-files runs for that gem,
+and its own requires.
+
+#7: Security
+------------
+
+Rubygems break-in, January 2013
+
+"Nobody Cares About Signed Gems"
+
+http://www.rubygems-openpgp-ca.org/blog/nobody-cares-about-signed-gems.html
+
+We can do better
+----------------
+
+PGP Keysigning event?
+
+Tony Arcieri, RubyConf 2013:
+
+"Being Boring: A Survival Guide to Ruby Cryptography"
+
+http://tonyarcieri.com/lets-figure-out-a-way-to-start-signing-rubygems
+
+#8: Saving typing
+-----------------
+
+Jeweler, Hoe
+
+gem-release plugin, adds subcommands to gem:
+
+bootstrap, gemspec, release, tag, bump
+
+#9: Bundler?
+------------
+
+Ruby gems 2.2.0 release, Dec. 26, 2013:
+
+In History.txt (and in release notes):
+
+RubyGems can check for gem dependencies files (gem.deps.rb or Gemfile) when
+rubygems executables are started and uses the found dependencies.  This
+means rake will work similar to bundle exec rake.  To enable this set
+the RUBYGEMS_GEMDEPS environment variable to the location of your
+dependencies file.  See Gem::use_gemdeps for further details.
+
+-----
+gem install --file Gemfile
+-----
+
+#10: You
+--------
+
+You & Rubygems
+
+Thanks
+------
+
+Chris Riddoch
+riddochc@gmail.com
+http://syntacticsugar.org/
